@@ -41,14 +41,10 @@ var upgrader = websocket.Upgrader{
 type Client struct {
 	RoomID   string
 	Username string
-
 	ChatRoom *Hub
 
-	// The websocket connection.
-	conn *websocket.Conn
-
-	// Buffered channel of outbound messages.
-	send chan []byte
+	conn *websocket.Conn // The websocket connection.
+	send chan []byte     // Buffered channel of outbound messages.
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -61,10 +57,13 @@ func (c *Client) readPump() {
 		c.ChatRoom.unregister <- c
 		c.conn.Close()
 	}()
+
+	log.Printf("msg from user: %v", c.Username)
 	c.conn.SetReadLimit(maxMessageSize)
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
+
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
@@ -90,7 +89,7 @@ func (c *Client) writePump() {
 	}()
 	for {
 		select {
-		case message, ok := <-c.send:
+		case msgBytes, ok := <-c.send:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel.
@@ -102,7 +101,16 @@ func (c *Client) writePump() {
 			if err != nil {
 				return
 			}
-			w.Write(message)
+
+			// compose message
+			// var broadcaseMsg WebsocketMessage
+			// if err := json.Unmarshal(msgBytes, &broadcaseMsg); err != nil {
+			// 	log.Println("fail to unmarshal broadcastMsg: ", err)
+			// 	continue
+			// }
+			// msgToClient := fmt.Sprintf("%v: %v", broadcaseMsg.Username, broadcaseMsg.Message)
+			// w.Write([]byte(msgToClient))
+			w.Write(msgBytes)
 
 			// Add queued chat messages to the current websocket message.
 			n := len(c.send)

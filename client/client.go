@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -39,9 +40,11 @@ func receiveHandler(conn *websocket.Conn) {
 
 		if msg.Message == "welcome" {
 			clientRoomID = msg.RoomID
-			clientUsername = msg.RoomID
+			clientUsername = msg.Username
+			fmt.Printf("Welcome %v", msg.Username)
+			continue
 		}
-		log.Printf("received msg: %+v", msg)
+		log.Printf("%v: %v", msg.Username, msg.Message)
 	}
 }
 
@@ -60,6 +63,7 @@ func main() {
 	if *roomIDPtr != "" {
 		socketURL = socketURL + "/" + *roomIDPtr
 	}
+	log.Println("socket url: ", socketURL)
 
 	conn, _, err := websocket.DefaultDialer.Dial(socketURL, nil)
 	if err != nil {

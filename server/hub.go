@@ -45,11 +45,13 @@ func (h *Hub) run() {
 		case client := <-h.register:
 			h.clients[client] = true
 
-			msgBytes, err := json.Marshal(WebsocketMessage{
+			welcomeMsg := WebsocketMessage{
 				RoomID:   client.RoomID,
 				Username: client.Username,
 				Message:  "welcome",
-			})
+			}
+			log.Printf("welcome: %+v", welcomeMsg)
+			msgBytes, err := json.Marshal(welcomeMsg)
 			if err != nil {
 				log.Println("fail to marshal:", err)
 				continue
@@ -61,13 +63,27 @@ func (h *Hub) run() {
 				delete(h.clients, client)
 				close(client.send)
 			}
-		case message := <-h.broadcast:
+		case msgByte := <-h.broadcast:
 			// byte to struct
 			// check the room id and sender name - filtering
-			//
+			var receivedMsg WebsocketMessage
+			if err := json.Unmarshal(msgByte, &receivedMsg); err != nil {
+				log.Println("fail to marshal:", err)
+				continue
+			}
+
 			for client := range h.clients {
+				// temporary disable
+				// if client.RoomID != receivedMsg.RoomID {
+				// 	log.Printf("not send msg: Client RoomID: %v, receivedMsg RoomID: %v", client.RoomID, receivedMsg.RoomID)
+				// 	continue
+				// }
+				if client.Username == receivedMsg.Username {
+					log.Printf("not send msg to sender back: username is %v", receivedMsg.Username)
+					continue
+				}
 				select {
-				case client.send <- message:
+				case client.send <- msgByte:
 				default:
 					close(client.send)
 					delete(h.clients, client)

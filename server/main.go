@@ -34,10 +34,17 @@ func main() {
 	// router
 	r := mux.NewRouter()
 	r.HandleFunc("/", serveHome)
+
 	r.HandleFunc("/ws/{roomID}", func(w http.ResponseWriter, r *http.Request) {
 		params := mux.Vars(r)
-		roomID := params["roodID"]
+		roomID := params["roomID"]
 		log.Printf("Room ID is %v", roomID)
+		serveWs(hub, roomID, w, r)
+	})
+
+	r.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("create new room")
+		var roomID string
 		serveWs(hub, roomID, w, r)
 	})
 	http.Handle("/", r)
