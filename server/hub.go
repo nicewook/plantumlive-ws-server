@@ -3,6 +3,11 @@
 // license that can be found in the LICENSE file.
 package main
 
+import (
+	"encoding/json"
+	"log"
+)
+
 // Hub maintains the set of active clients and broadcasts messages to the
 // clients.
 type Hub struct {
@@ -19,6 +24,12 @@ type Hub struct {
 	unregister chan *Client
 }
 
+type WebsocketMessage struct {
+	RoomID   string `json:"roomid,omitempty"`
+	Username string `json:"username,omitempty"`
+	Message  string `json:"message,omitempty"`
+}
+
 func newHub() *Hub {
 	return &Hub{
 		broadcast:  make(chan []byte),
@@ -33,12 +44,27 @@ func (h *Hub) run() {
 		select {
 		case client := <-h.register:
 			h.clients[client] = true
+
+			msgBytes, err := json.Marshal(WebsocketMessage{
+				RoomID:   client.RoomID,
+				Username: client.Username,
+				Message:  "welcome",
+			})
+			if err != nil {
+				log.Println("fail to marshal:", err)
+				continue
+			}
+			client.send <- msgBytes
+
 		case client := <-h.unregister:
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				close(client.send)
 			}
 		case message := <-h.broadcast:
+			// byte to struct
+			// check the room id and sender name - filtering
+			//
 			for client := range h.clients {
 				select {
 				case client.send <- message:

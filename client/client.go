@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
+	"flag"
 	"log"
 	"os"
 	"os/signal"
@@ -15,19 +17,39 @@ var (
 	interrupt chan os.Signal
 )
 
+var (
+	clientRoomID   string
+	clientUsername string
+)
+
+type WebsocketMessage struct {
+	RoomID   string `json:"roomid,omitempty"`
+	Username string `json:"username,omitempty"`
+	Message  string `json:"message,omitempty"`
+}
+
 func receiveHandler(conn *websocket.Conn) {
 	defer close(done)
+	var msg WebsocketMessage
 	for {
-		_, msg, err := conn.ReadMessage()
-		if err != nil {
+		if err := conn.ReadJSON(&msg); err != nil {
 			log.Println("error on receiving:", err)
 			return
 		}
-		log.Printf("received msg: %s", msg)
+
+		if msg.Message == "welcome" {
+			clientRoomID = msg.RoomID
+			clientUsername = msg.RoomID
+		}
+		log.Printf("received msg: %+v", msg)
 	}
 }
 
 func main() {
+
+	roomIDPtr := flag.String("roomid", "", "rood id to enter")
+	flag.Parse()
+
 	done = make(chan interface{})
 	interrupt = make(chan os.Signal)
 	sendMsg := make(chan string)
@@ -35,6 +57,10 @@ func main() {
 	signal.Notify(interrupt, os.Interrupt)
 
 	socketURL := "ws://localhost:8080" + "/ws"
+	if *roomIDPtr != "" {
+		socketURL = socketURL + "/" + *roomIDPtr
+	}
+
 	conn, _, err := websocket.DefaultDialer.Dial(socketURL, nil)
 	if err != nil {
 		log.Fatal("error connecting to websocket server:", err)
@@ -46,7 +72,20 @@ func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	go func() {
 		for scanner.Scan() {
-			sendMsg <- scanner.Text()
+			message := scanner.Text()
+
+			msgBytes, err := json.Marshal(WebsocketMessage{
+				RoomID:   clientRoomID,
+				Username: clientUsername,
+				Message:  message,
+			})
+			if err != nil {
+				log.Println("fail to marshal:", err)
+				continue
+			}
+
+			// RoomID, Username, Message - struct
+			sendMsg <- string(msgBytes)
 		}
 	}()
 

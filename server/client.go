@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -38,7 +39,8 @@ var upgrader = websocket.Upgrader{
 
 // Client is a middleman between the websocket connection and the hub.
 type Client struct {
-	RoomID string
+	RoomID   string
+	Username string
 
 	ChatRoom *Hub
 
@@ -121,14 +123,29 @@ func (c *Client) writePump() {
 	}
 }
 
+var usernameNum int
+
 // serveWs handles websocket requests from the peer.
-func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
+func serveWs(hub *Hub, roomID string, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	client := &Client{ChatRoom: hub, conn: conn, send: make(chan []byte, 256)}
+	if roomID == "" {
+		roomID = NewRoomID()
+	}
+
+	username := fmt.Sprintf("user name %d", usernameNum)
+	usernameNum++
+
+	client := &Client{
+		RoomID:   roomID,
+		Username: username,
+		ChatRoom: hub,
+		conn:     conn,
+		send:     make(chan []byte, 256),
+	}
 	client.ChatRoom.register <- client
 
 	// Allow collection of memory referenced by the caller by doing all work in
