@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"log"
 	"os"
 	"os/signal"
@@ -29,6 +30,7 @@ func receiveHandler(conn *websocket.Conn) {
 func main() {
 	done = make(chan interface{})
 	interrupt = make(chan os.Signal)
+	sendMsg := make(chan string)
 
 	signal.Notify(interrupt, os.Interrupt)
 
@@ -40,10 +42,18 @@ func main() {
 	defer conn.Close()
 	go receiveHandler(conn)
 
+	// client writes
+	scanner := bufio.NewScanner(os.Stdin)
+	go func() {
+		for scanner.Scan() {
+			sendMsg <- scanner.Text()
+		}
+	}()
+
 	for {
 		select {
-		case <-time.After(1 * time.Second):
-			if err := conn.WriteMessage(websocket.TextMessage, []byte("Hello from Client")); err != nil {
+		case message := <-sendMsg:
+			if err := conn.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
 				log.Println("error on writing to websocket server:", err)
 				return
 			}
