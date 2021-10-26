@@ -55,7 +55,7 @@ func main() {
 
 	done = make(chan interface{})
 	interrupt = make(chan os.Signal)
-	sendMsg := make(chan string)
+	sendMsg := make(chan []byte)
 
 	signal.Notify(interrupt, os.Interrupt)
 
@@ -89,14 +89,14 @@ func main() {
 			}
 
 			// RoomID, Username, Message - struct
-			sendMsg <- string(msgBytes)
+			sendMsg <- msgBytes
 		}
 	}()
 
 	for {
 		select {
 		case message := <-sendMsg:
-			if err := conn.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
+			if err := conn.WriteMessage(websocket.TextMessage, message); err != nil {
 				log.Println("error on writing to websocket server:", err)
 				return
 			}
