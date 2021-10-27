@@ -9,6 +9,8 @@ import (
 	"log"
 	"net/http"
 
+	_ "plantumlive-ws-server/proto/wsmsg"
+
 	"github.com/gorilla/mux"
 )
 
