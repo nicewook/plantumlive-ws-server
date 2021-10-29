@@ -6,6 +6,9 @@ package main
 import (
 	"encoding/json"
 	"log"
+	wsmsg "plantumlive-ws-server/wsmsg"
+
+	"google.golang.org/protobuf/proto"
 )
 
 // Hub maintains the set of active clients and broadcasts messages to the
@@ -45,13 +48,20 @@ func (h *Hub) run() {
 		case client := <-h.register:
 			h.clients[client] = true
 
-			welcomeMsg := WebsocketMessage{
-				RoomID:   client.RoomID,
-				Username: client.Username,
-				Message:  "welcome",
+			// make msg and serialize and send to client welcom
+			// welcomeMsg := WebsocketMessage{
+			// 	RoomID:   client.RoomID,
+			// 	Username: client.Username,
+			// 	Message:  "welcome",
+			// }
+			welcomeMsg := &wsmsg.WebsocketMessage{
+				Type:      "welcome",
+				SessionId: client.RoomID,
+				Username:  client.Username,
+				Message:   "welcome",
 			}
-			log.Printf("welcome: %+v", welcomeMsg)
-			msgBytes, err := json.Marshal(welcomeMsg)
+
+			msgBytes, err := proto.Marshal(welcomeMsg)
 			if err != nil {
 				log.Println("fail to marshal:", err)
 				continue

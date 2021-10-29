@@ -4,13 +4,15 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"google.golang.org/protobuf/proto"
+
+	wsmsg "websocket-client/wsmsg"
 )
 
 var (
@@ -29,20 +31,39 @@ type WebsocketMessage struct {
 	Message  string `json:"message,omitempty"`
 }
 
+// JSON
+// func receiveHandler(conn *websocket.Conn) {
+// 	defer close(done)
+// 	var msg WebsocketMessage
+// 	for {
+// 		if err := conn.ReadJSON(&msg); err != nil {
+// 			log.Println("error on receiving:", err)
+// 			return
+// 		}
+
+// 		if msg.Message == "welcome" {
+// 			clientRoomID = msg.RoomID
+// 			clientUsername = msg.Username
+// 			fmt.Printf("Welcome %v", msg.Username)
+// 			continue
+// 		}
+// 		log.Printf("%v: %v", msg.Username, msg.Message)
+// 	}
+// }
+
+// protobuf
 func receiveHandler(conn *websocket.Conn) {
 	defer close(done)
-	var msg WebsocketMessage
 	for {
-		if err := conn.ReadJSON(&msg); err != nil {
+		_, b, err := conn.ReadMessage()
+		if err != nil {
 			log.Println("error on receiving:", err)
 			return
 		}
 
-		if msg.Message == "welcome" {
-			clientRoomID = msg.RoomID
-			clientUsername = msg.Username
-			fmt.Printf("Welcome %v", msg.Username)
-			continue
+		msg := &wsmsg.WebsocketMessage{}
+		if err := proto.Unmarshal(b, msg); err != nil {
+			log.Printf("%v: %v", msg.Username, msg.Message)
 		}
 		log.Printf("%v: %v", msg.Username, msg.Message)
 	}

@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package wsmsg;
+
+option go_package = "./wsmsg";
+
+message WebsocketMessage {
+  string type = 1;
+  string session_id = 2;
+  string username = 3;
+  string message = 4;
+}

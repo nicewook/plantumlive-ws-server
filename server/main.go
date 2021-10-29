@@ -9,7 +9,7 @@ import (
 	"log"
 	"net/http"
 
-	_ "plantumlive-ws-server/proto/wsmsg"
+	_ "plantumlive-ws-server/wsmsg"
 
 	"github.com/gorilla/mux"
 )
