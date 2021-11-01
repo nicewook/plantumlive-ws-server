@@ -5,7 +5,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -39,22 +38,21 @@ var upgrader = websocket.Upgrader{
 
 // Client is a middleman between the websocket connection and the hub.
 type Client struct {
-	RoomID   string
-	Username string
-	ChatRoom *Hub
+	SessionID string
+	Username  string
+	Session   *Hub
 
 	conn *websocket.Conn // The websocket connection.
 	send chan []byte     // Buffered channel of outbound messages.
 }
 
 // readPump pumps messages from the websocket connection to the hub.
-//
 // The application runs readPump in a per-connection goroutine. The application
 // ensures that there is at most one reader on a connection by executing all
 // reads from this goroutine.
 func (c *Client) readPump() {
 	defer func() {
-		c.ChatRoom.unregister <- c
+		c.Session.unregister <- c
 		c.conn.Close()
 	}()
 
@@ -72,7 +70,7 @@ func (c *Client) readPump() {
 			break
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		c.ChatRoom.broadcast <- message
+		c.Session.broadcast <- message
 	}
 }
 
@@ -134,27 +132,20 @@ func (c *Client) writePump() {
 var usernameNum int
 
 // serveWs handles websocket requests from the peer.
-func serveWs(hub *Hub, roomID string, w http.ResponseWriter, r *http.Request) {
+func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	if roomID == "" {
-		roomID = NewRoomID()
-	}
 
-	username := fmt.Sprintf("user name %d", usernameNum)
-	usernameNum++
-
+	// no SessionID, no Username yet
 	client := &Client{
-		RoomID:   roomID,
-		Username: username,
-		ChatRoom: hub,
-		conn:     conn,
-		send:     make(chan []byte, 256),
+		Session: hub,
+		conn:    conn,
+		send:    make(chan []byte, 256),
 	}
-	client.ChatRoom.register <- client
+	client.Session.register <- client
 
 	// Allow collection of memory referenced by the caller by doing all work in
 	// new goroutines.

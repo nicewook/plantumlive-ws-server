@@ -81,6 +81,12 @@ gen.all:
 	cd server && wire ./...
 	buf generate
 
+.PHONY: gen.proto
+gen.proto: 
+	cd client && rm -rf wsmsg
+	buf generate
+	cp -r server/wsmsg client/wsmsg
+
 .PHONY: test
 test: test.go test.dart ## test go and dart files
 

@@ -30,6 +30,7 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	hub := newHub()
 	go hub.run()
 
@@ -37,18 +38,11 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/", serveHome)
 
-	r.HandleFunc("/ws/{roomID}", func(w http.ResponseWriter, r *http.Request) {
-		params := mux.Vars(r)
-		roomID := params["roomID"]
-		log.Printf("Room ID is %v", roomID)
-		serveWs(hub, roomID, w, r)
+	r.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("websocket connection received")
+		serveWs(hub, w, r)
 	})
 
-	r.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("create new room")
-		var roomID string
-		serveWs(hub, roomID, w, r)
-	})
 	http.Handle("/", r)
 	if err := http.ListenAndServe(*addr, nil); err != nil {
 		log.Fatal("ListenAndServe: ", err)

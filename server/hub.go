@@ -4,7 +4,6 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	wsmsg "plantumlive-ws-server/wsmsg"
 
@@ -42,23 +41,21 @@ func newHub() *Hub {
 	}
 }
 
+const (
+	TypeConnected = "connected"
+	TypeJoin      = "join-session"
+	TypeMsg       = "message"
+)
+
 func (h *Hub) run() {
 	for {
 		select {
 		case client := <-h.register:
 			h.clients[client] = true
 
-			// make msg and serialize and send to client welcom
-			// welcomeMsg := WebsocketMessage{
-			// 	RoomID:   client.RoomID,
-			// 	Username: client.Username,
-			// 	Message:  "welcome",
-			// }
 			welcomeMsg := &wsmsg.WebsocketMessage{
-				Type:      "welcome",
-				SessionId: client.RoomID,
-				Username:  client.Username,
-				Message:   "welcome",
+				Type:    TypeConnected,
+				Message: "You are connected to websocket server",
 			}
 
 			msgBytes, err := proto.Marshal(welcomeMsg)
@@ -76,25 +73,25 @@ func (h *Hub) run() {
 		case msgByte := <-h.broadcast:
 			// byte to struct
 			// check the room id and sender name - filtering
-			var receivedMsg WebsocketMessage
-			if err := json.Unmarshal(msgByte, &receivedMsg); err != nil {
-				log.Println("fail to marshal:", err)
+			receivedMsg := &wsmsg.WebsocketMessage{}
+			log.Printf("%+v", string(msgByte))
+			if err := proto.Unmarshal(msgByte, receivedMsg); err != nil {
+				log.Println("fail to unmarshal:", err)
 				continue
 			}
 
 			for client := range h.clients {
-				// temporary disable
-				// if client.RoomID != receivedMsg.RoomID {
-				// 	log.Printf("not send msg: Client RoomID: %v, receivedMsg RoomID: %v", client.RoomID, receivedMsg.RoomID)
-				// 	continue
-				// }
+				if client.SessionID != receivedMsg.SessionId {
+					log.Printf("not send msg: Client RoomID: %v, receivedMsg RoomID: %v", client.SessionID, receivedMsg.SessionId)
+					continue
+				}
 				if client.Username == receivedMsg.Username {
 					log.Printf("not send msg to sender back: username is %v", receivedMsg.Username)
 					continue
 				}
 				select {
 				case client.send <- msgByte:
-				default:
+				default: // if client cannot consume, clear client
 					close(client.send)
 					delete(h.clients, client)
 				}
