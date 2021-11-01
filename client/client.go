@@ -55,7 +55,7 @@ func receiveHandler(conn *websocket.Conn) {
 				Type:      TypeJoin, // TODO: proto enum
 				SessionId: *sessionIDP,
 				Username:  *usernameP,
-				// Message:   fmt.Sprintf("Let me join the session named: %v", *sessionIDP),
+				Message:   fmt.Sprintf("Let me join the session named: %v", *sessionIDP),
 			})
 			if err != nil {
 				log.Println("fail to marshal:", err)

@@ -74,19 +74,26 @@ func (h *Hub) run() {
 			// byte to struct
 			// check the room id and sender name - filtering
 			receivedMsg := &wsmsg.WebsocketMessage{}
-			log.Printf("%+v", string(msgByte))
+			// log.Printf("%+v", string(msgByte))
 			if err := proto.Unmarshal(msgByte, receivedMsg); err != nil {
 				log.Println("fail to unmarshal:", err)
 				continue
 			}
 
 			for client := range h.clients {
-				if client.SessionID != receivedMsg.SessionId {
-					log.Printf("not send msg: Client RoomID: %v, receivedMsg RoomID: %v", client.SessionID, receivedMsg.SessionId)
-					continue
-				}
-				if client.Username == receivedMsg.Username {
-					log.Printf("not send msg to sender back: username is %v", receivedMsg.Username)
+				// temp disable
+				// if client.SessionID != receivedMsg.SessionId {
+				// 	log.Printf("send msg only to proper session clients: %+v", receivedMsg.SessionId)
+				// 	continue
+				// }
+
+				if client.Username == receivedMsg.Username { // join
+					if receivedMsg.Type == TypeJoin {
+						client.SessionID = receivedMsg.SessionId
+						client.Username = receivedMsg.Username
+					} else {
+						log.Printf("not send msg to sender back: username is %v", receivedMsg.Username)
+					}
 					continue
 				}
 				select {
