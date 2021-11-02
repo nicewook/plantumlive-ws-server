@@ -4,9 +4,11 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	wsmsg "plantumlive-ws-server/wsmsg"
 
+	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -14,30 +16,28 @@ import (
 // clients.
 type Hub struct {
 	// Registered clients.
-	clients map[*Client]bool
+	clients map[*websocket.Conn]*Client
 
 	// Inbound messages from the clients.
 	broadcast chan []byte
 
-	// Register requests from the clients.
+	// Register requests from the clients. - just connect
 	register chan *Client
+
+	// Join messages from the clients - after connect
+	join chan *Client
 
 	// Unregister requests from clients.
 	unregister chan *Client
 }
 
-type WebsocketMessage struct {
-	RoomID   string `json:"roomid,omitempty"`
-	Username string `json:"username,omitempty"`
-	Message  string `json:"message,omitempty"`
-}
-
 func newHub() *Hub {
 	return &Hub{
-		broadcast:  make(chan []byte),
+		broadcast:  make(chan []byte, 10),
 		register:   make(chan *Client),
+		join:       make(chan *Client),
 		unregister: make(chan *Client),
-		clients:    make(map[*Client]bool),
+		clients:    make(map[*websocket.Conn]*Client),
 	}
 }
 
@@ -51,7 +51,8 @@ func (h *Hub) run() {
 	for {
 		select {
 		case client := <-h.register:
-			h.clients[client] = true
+			fmt.Println("an user connected to websocket server")
+			h.clients[client.conn] = client
 
 			welcomeMsg := &wsmsg.WebsocketMessage{
 				Type:    TypeConnected,
@@ -66,41 +67,60 @@ func (h *Hub) run() {
 			client.send <- msgBytes
 
 		case client := <-h.unregister:
-			if _, ok := h.clients[client]; ok {
-				delete(h.clients, client)
+			if _, ok := h.clients[client.conn]; ok {
+				fmt.Printf("disconnect user %s in the session %s\n", client.Username, client.SessionID)
+				delete(h.clients, client.conn)
 				close(client.send)
 			}
+
+		case joinClient := <-h.join:
+			fmt.Println(joinClient)
+			// re-register client
+			h.clients[joinClient.conn] = joinClient
+
+			// join message to everybody
+			msgBytes, err := proto.Marshal(&wsmsg.WebsocketMessage{
+				Type:      TypeJoin, // TODO: proto enum
+				SessionId: joinClient.SessionID,
+				Username:  joinClient.Username,
+				Message:   fmt.Sprintf("user %s just joined", joinClient.Username),
+			})
+			if err != nil {
+				log.Println("fail to marshal:", err)
+				continue
+			}
+			fmt.Println("send broadcase msg %v", msgBytes)
+
+			h.broadcast <- msgBytes
+
 		case msgByte := <-h.broadcast:
+			fmt.Println("broadcast received %+v", msgByte)
 			// byte to struct
 			// check the room id and sender name - filtering
 			receivedMsg := &wsmsg.WebsocketMessage{}
-			// log.Printf("%+v", string(msgByte))
 			if err := proto.Unmarshal(msgByte, receivedMsg); err != nil {
 				log.Println("fail to unmarshal:", err)
 				continue
 			}
+			fmt.Printf("session %s: user %s\t: %v\n", receivedMsg.SessionId, receivedMsg.Username, receivedMsg.Message)
 
-			for client := range h.clients {
-				// temp disable
-				// if client.SessionID != receivedMsg.SessionId {
-				// 	log.Printf("send msg only to proper session clients: %+v", receivedMsg.SessionId)
-				// 	continue
-				// }
-
-				if client.Username == receivedMsg.Username { // join
-					if receivedMsg.Type == TypeJoin {
-						client.SessionID = receivedMsg.SessionId
-						client.Username = receivedMsg.Username
-					} else {
-						log.Printf("not send msg to sender back: username is %v", receivedMsg.Username)
-					}
+			for _, client := range h.clients {
+				fmt.Printf("client %+v\n", client)
+				if client.Username == receivedMsg.Username && receivedMsg.Type != TypeJoin {
+					log.Printf("not send msg to sender back: username is %v", receivedMsg.Username)
 					continue
 				}
+
+				if client.SessionID != receivedMsg.SessionId {
+					log.Printf("send msg only to proper session clients: %s != %s", client.SessionID, receivedMsg.SessionId)
+					continue
+				}
+
 				select {
 				case client.send <- msgByte:
 				default: // if client cannot consume, clear client
 					close(client.send)
-					delete(h.clients, client)
+					delete(h.clients, client.conn)
 				}
 			}
 		}

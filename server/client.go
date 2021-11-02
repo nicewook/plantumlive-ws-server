@@ -4,11 +4,14 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	wsmsg "plantumlive-ws-server/wsmsg"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -60,7 +63,6 @@ func (c *Client) readPump() {
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
-
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
@@ -69,6 +71,22 @@ func (c *Client) readPump() {
 			break
 		}
 		// message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
+		if c.Username == "" {
+			fmt.Println("join management")
+			// unmarshal
+			msg := &wsmsg.WebsocketMessage{}
+			if err := proto.Unmarshal(message, msg); err != nil {
+				log.Printf("err: %v. %v: %v", err, msg.Username, msg.Message)
+			}
+
+			c.SessionID = msg.GetSessionId()
+			c.Username = msg.GetUsername()
+
+			// compoose client
+			fmt.Printf("join client %v\n", c)
+			c.Session.join <- c
+			continue
+		}
 		c.Session.broadcast <- message
 	}
 }
@@ -99,14 +117,6 @@ func (c *Client) writePump() {
 				return
 			}
 
-			// compose message
-			// var broadcaseMsg WebsocketMessage
-			// if err := json.Unmarshal(msgBytes, &broadcaseMsg); err != nil {
-			// 	log.Println("fail to unmarshal broadcastMsg: ", err)
-			// 	continue
-			// }
-			// msgToClient := fmt.Sprintf("%v: %v", broadcaseMsg.Username, broadcaseMsg.Message)
-			// w.Write([]byte(msgToClient))
 			w.Write(msgBytes)
 
 			// Add queued chat messages to the current websocket message.
@@ -144,6 +154,7 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		conn:    conn,
 		send:    make(chan []byte, 256),
 	}
+	log.Println("register client")
 	client.Session.register <- client
 
 	// Allow collection of memory referenced by the caller by doing all work in
