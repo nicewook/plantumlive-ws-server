@@ -4,8 +4,18 @@ package wsmsg;
 
 option go_package = "./wsmsg";
 
+enum Type {
+  // command type
+  Unknown = 0;
+  Connected = 1;
+  Join = 2;
+
+  // message type
+  Msg = 100;
+}
+
 message WebsocketMessage {
-  string type = 1;
+  Type type = 1;
   string session_id = 2;
   string username = 3;
   string message = 4;

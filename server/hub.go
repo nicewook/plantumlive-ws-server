@@ -55,7 +55,7 @@ func (h *Hub) run() {
 			h.clients[client.conn] = client
 
 			welcomeMsg := &wsmsg.WebsocketMessage{
-				Type:    TypeConnected,
+				Type:    wsmsg.Type_Connected,
 				Message: "You are connected to websocket server",
 			}
 
@@ -79,7 +79,7 @@ func (h *Hub) run() {
 
 			// join message to everybody
 			msgBytes, err := proto.Marshal(&wsmsg.WebsocketMessage{
-				Type:      TypeJoin, // TODO: proto enum
+				Type:      wsmsg.Type_Join, // TODO: proto enum
 				SessionId: joinClient.SessionID,
 				Username:  joinClient.Username,
 				Message:   fmt.Sprintf("=== user %s just joined ===", joinClient.Username),
@@ -102,7 +102,7 @@ func (h *Hub) run() {
 
 			for _, client := range h.clients {
 				if client.Username == msg.Username {
-					if msg.Type != TypeJoin {
+					if msg.Type != wsmsg.Type_Join {
 						log.Printf("not send msg to sender back: username is %v", msg.Username)
 						continue
 					}
