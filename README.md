@@ -1,13 +1,24 @@
 # PlantUMLive Websocket server
 
-## install tool-chain: buf, protoc
+## install buf 
 
-`make install.buf`
+`make install`
 
-```
-install buf, protoc-gen-buf-breaking, and protoc 
-to ~/.local/bin and add the path 
+Install buf, protoc-gen-buf-breaking, and protoc-gen-buf-lint to `~/.local/bin` 
 
-TODO: check if they are exist already and add path permanently
-```
+## generate proto
+
+`make gen.proto`
+
+Compile .proto and generate .go for the server and copy them to client.
+
+Before run the compile, it will add `~/.local/bin` to the PATH
+
+## Run the server and client
+
+
+
+
+
+
 
