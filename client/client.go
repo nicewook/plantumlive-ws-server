@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -21,14 +22,9 @@ var (
 	sendMsg   chan []byte
 )
 
-var (
-	sessionIDP *string
-	usernameP  *string
-)
-
 const (
 	TypeConnected = "connected"
-	TypeJoin      = "join-session"
+	TypeJoin      = "joinSession"
 	TypeMsg       = "message"
 )
 
@@ -49,7 +45,7 @@ func receiveHandler(conn *websocket.Conn) {
 		// filtering and displaying
 		switch msg.Type {
 		case TypeConnected:
-			log.Printf("connected: %v", msg.Message)
+			fmt.Printf("=== websocket server connected: %v ===\n", msg.Message)
 			// ask for join automatically
 			msgBytes, err := proto.Marshal(&wsmsg.WebsocketMessage{
 				Type:      TypeJoin, // TODO: proto enum
@@ -61,22 +57,56 @@ func receiveHandler(conn *websocket.Conn) {
 				log.Println("fail to marshal:", err)
 				continue
 			}
-
 			sendMsg <- msgBytes
+		case TypeJoin:
+			if msg.GetUsername() == *usernameP {
+				fmt.Printf("=== joined to the sesson %s successfully ===\n", msg.GetMessage())
+			} else {
+				fmt.Printf("\n%v\n\n", msg.GetMessage())
+			}
 		case TypeMsg:
+			fmt.Printf("session %s: user %s\t: %v\n", msg.SessionId, msg.Username, msg.Message)
 		default:
-			log.Printf("unknown type of message: %+v", msg.Type)
+			fmt.Printf("unknown type of message: %s\n", msg.GetType())
 		}
-		fmt.Printf("msg received: %v: %v\n", msg.Username, msg.Message)
+		log.Printf("msg received: %v: %v\n", msg.Username, msg.Message)
+	}
+}
+
+var (
+	urlP       = flag.String("url", "", "websocket server url. default is ws://localhost:8080/ws")
+	sessionIDP = flag.String("sessionid", "", "sessionid to join")
+	usernameP  = flag.String("username", "", "username to use")
+	debug      = flag.Bool("debug", false, "display debugging log")
+)
+
+func scanMessage() {
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		message := scanner.Text()
+		log.Printf("session id: %v, username: %v", *sessionIDP, *usernameP)
+		msgBytes, err := proto.Marshal(&wsmsg.WebsocketMessage{
+			Type:      TypeMsg, // TODO: proto enum
+			SessionId: *sessionIDP,
+			Username:  *usernameP,
+			Message:   message,
+		})
+		if err != nil {
+			log.Println("fail to marshal:", err)
+			continue
+		}
+		sendMsg <- msgBytes
 	}
 }
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	urlP := flag.String("url", "", "websocket server url")
-	sessionIDP = flag.String("sid", "", "roodid to enter")
-	usernameP = flag.String("uname", "", "username to use")
 	flag.Parse()
+
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	if !(*debug) {
+		log.SetOutput(ioutil.Discard)
+	}
+	log.Printf("session id: %v, username: %v", *sessionIDP, *usernameP)
 
 	done = make(chan interface{})
 	interrupt = make(chan os.Signal)
@@ -95,28 +125,9 @@ func main() {
 		log.Fatal("error connecting to websocket server:", err)
 	}
 	defer conn.Close()
+
 	go receiveHandler(conn)
-
-	// client writes
-	scanner := bufio.NewScanner(os.Stdin)
-	go func() {
-		for scanner.Scan() {
-			message := scanner.Text()
-
-			msgBytes, err := proto.Marshal(&wsmsg.WebsocketMessage{
-				Type:      TypeMsg, // TODO: proto enum
-				SessionId: *sessionIDP,
-				Username:  *usernameP,
-				Message:   message,
-			})
-			if err != nil {
-				log.Println("fail to marshal:", err)
-				continue
-			}
-
-			sendMsg <- msgBytes
-		}
-	}()
+	go scanMessage()
 
 	for {
 		select {

@@ -72,7 +72,7 @@ func (c *Client) readPump() {
 		}
 		// message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
 		if c.Username == "" {
-			fmt.Println("join management")
+			log.Println("join management")
 			// unmarshal
 			msg := &wsmsg.WebsocketMessage{}
 			if err := proto.Unmarshal(message, msg); err != nil {

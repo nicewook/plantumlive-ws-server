@@ -43,7 +43,7 @@ func newHub() *Hub {
 
 const (
 	TypeConnected = "connected"
-	TypeJoin      = "join-session"
+	TypeJoin      = "joinSession"
 	TypeMsg       = "message"
 )
 
@@ -51,7 +51,7 @@ func (h *Hub) run() {
 	for {
 		select {
 		case client := <-h.register:
-			fmt.Println("an user connected to websocket server")
+			log.Println("an user connected to websocket server")
 			h.clients[client.conn] = client
 
 			welcomeMsg := &wsmsg.WebsocketMessage{
@@ -74,8 +74,7 @@ func (h *Hub) run() {
 			}
 
 		case joinClient := <-h.join:
-			fmt.Println(joinClient)
-			// re-register client
+			// re-register client with SessionId and Username
 			h.clients[joinClient.conn] = joinClient
 
 			// join message to everybody
@@ -83,36 +82,35 @@ func (h *Hub) run() {
 				Type:      TypeJoin, // TODO: proto enum
 				SessionId: joinClient.SessionID,
 				Username:  joinClient.Username,
-				Message:   fmt.Sprintf("user %s just joined", joinClient.Username),
+				Message:   fmt.Sprintf("=== user %s just joined ===", joinClient.Username),
 			})
 			if err != nil {
 				log.Println("fail to marshal:", err)
 				continue
 			}
-			fmt.Println("send broadcase msg %v", msgBytes)
-
 			h.broadcast <- msgBytes
 
 		case msgByte := <-h.broadcast:
-			fmt.Println("broadcast received %+v", msgByte)
-			// byte to struct
-			// check the room id and sender name - filtering
-			receivedMsg := &wsmsg.WebsocketMessage{}
-			if err := proto.Unmarshal(msgByte, receivedMsg); err != nil {
+
+			// filtering: check the SessionId and Username
+			msg := &wsmsg.WebsocketMessage{}
+			if err := proto.Unmarshal(msgByte, msg); err != nil {
 				log.Println("fail to unmarshal:", err)
 				continue
 			}
-			fmt.Printf("session %s: user %s\t: %v\n", receivedMsg.SessionId, receivedMsg.Username, receivedMsg.Message)
+			fmt.Printf("session %s: user %s\t: %v\n", msg.SessionId, msg.Username, msg.Message)
 
 			for _, client := range h.clients {
-				fmt.Printf("client %+v\n", client)
-				if client.Username == receivedMsg.Username && receivedMsg.Type != TypeJoin {
-					log.Printf("not send msg to sender back: username is %v", receivedMsg.Username)
-					continue
+				if client.Username == msg.Username {
+					if msg.Type != TypeJoin {
+						log.Printf("not send msg to sender back: username is %v", msg.Username)
+						continue
+					}
+					// before sending welcome message, send all the history to newlyjoined
 				}
 
-				if client.SessionID != receivedMsg.SessionId {
-					log.Printf("send msg only to proper session clients: %s != %s", client.SessionID, receivedMsg.SessionId)
+				if client.SessionID != msg.SessionId {
+					log.Printf("send msg only to proper session clients: %s != %s", client.SessionID, msg.SessionId)
 					continue
 				}
 
