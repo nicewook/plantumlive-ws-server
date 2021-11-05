@@ -17,7 +17,6 @@ Before run the compile, it will add `~/.local/bin` to the PATH
 ## Run the server and client
 
 test
-test2
 
 
 
