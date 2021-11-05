@@ -6,16 +6,15 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/mux"
 )
 
-var port = flag.String("port", ":8080", "http service address. default is :8080")
-var debug = flag.Bool("debug", false, "display debugging log")
+var debug = flag.Bool("d", false, "display debugging log")
 
 func main() {
 	flag.Parse()
@@ -36,8 +35,12 @@ func main() {
 	})
 	http.Handle("/", r)
 
-	fmt.Printf("websocket server started on http://localhost%s\n", *port)
-	if err := http.ListenAndServe(*port, nil); err != nil {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8081"
+		log.Printf("$PORT is not set, use default port %s", port)
+	}
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
 }
