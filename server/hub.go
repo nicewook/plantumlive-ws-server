@@ -103,10 +103,9 @@ func (h *Hub) run() {
 			for _, client := range h.clients {
 				if client.Username == msg.Username {
 					if msg.Type != wsmsg.Type_Join {
-						log.Printf("not send msg to sender back: username is %v", msg.Username)
-						continue
+						log.Printf("send all history first")
+						// before sending welcome message, send all the history to newlyjoined
 					}
-					// before sending welcome message, send all the history to newlyjoined
 				}
 
 				if client.SessionID != msg.SessionId {

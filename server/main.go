@@ -37,7 +37,7 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8081"
+		port = "8080"
 		log.Printf("$PORT is not set, use default port %s", port)
 	}
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
