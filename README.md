@@ -1,22 +1,24 @@
-# PlantUMLive Websocket server
-
-## install buf 
-
-`make install`
-
-Install buf, protoc-gen-buf-breaking, and protoc-gen-buf-lint to `~/.local/bin` 
-
-## generate proto
-
-`make gen.proto`
-
-Compile .proto and generate .go for the server and copy them to client.
-
-Before run the compile, it will add `~/.local/bin` to the PATH
-
-## Run the server and client
+# websocket with Gorilla
 
 
+Posting link: https://golangdocs.com/golang-gorilla-websockets
 
+GitHub: https://github.com/gorilla/websocket
 
+chatting example
+https://github.com/gorilla/websocket/tree/master/examples/chat
+
+## General design
+
+- server and ws
+
+### server
+
+- bind a port and start listening for connection
+- connection act over a raw HTTP connection
+
+### ws
+
+- try to connect with the server using websocket URL
+- BTW, you don't necessarilly need to implement with Golang
 
