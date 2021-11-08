@@ -69,9 +69,9 @@ func receiveHandler(conn *websocket.Conn) {
 
 var (
 	urlP       = flag.String("url", "", "websocket server url. default is ws://localhost:8080/ws")
-	sessionIDP = flag.String("sessionid", "", "sessionid to join")
-	usernameP  = flag.String("username", "", "username to use")
-	debug      = flag.Bool("debug", false, "display debugging log")
+	sessionIDP = flag.String("s", "", "sessionid to join")
+	usernameP  = flag.String("u", "", "username to use")
+	debug      = flag.Bool("d", false, "display debugging log")
 )
 
 func scanMessage() {

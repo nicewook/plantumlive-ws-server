@@ -1,1 +1,1 @@
-web: server/bin/plantumliveserver
+web: bin/plantumliveserver
