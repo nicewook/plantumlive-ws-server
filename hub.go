@@ -4,8 +4,11 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"log"
+	"os"
 	wsmsg "plantumlive-ws-server/wsmsg"
 
 	"github.com/gorilla/websocket"
@@ -46,6 +49,100 @@ const (
 	TypeJoin      = "joinSession"
 	TypeMsg       = "message"
 )
+
+const messageDir = "./messages/"
+
+func saveSessionMessage(msg wsmsg.WebsocketMessage, b []byte) error {
+
+	// open file
+	fn := messageDir + msg.SessionId + ".message"
+	f, err := os.OpenFile(fn, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// composite saving format
+	// type(1 byte) + lenght(4 bytes) + b
+	msgType := []byte{byte(msg.Type)}
+
+	length := make([]byte, 4)
+	buf := new(bytes.Buffer)
+	if err := binary.Write(buf, binary.LittleEndian, int32(len(b))); err != nil {
+		return err
+	}
+	copy(length, buf.Bytes())
+	b = append(length, b...)
+	b = append(msgType, b...)
+
+	if _, err := f.Write(b); err != nil {
+		return err
+	}
+	return nil
+}
+
+func getSessionMessage(msg wsmsg.WebsocketMessage) (messages []wsmsg.WebsocketMessage) {
+
+	fn := messageDir + msg.SessionId + ".message"
+
+	file, err := os.Open(fn)
+	if err != nil {
+		fmt.Println(err)
+		return messages
+	}
+	defer file.Close()
+
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(file)
+
+	bytes := buf.Bytes()
+	for len(bytes) > 5 {
+		// read type - do nothing for now
+		// msgType := bytes[0]
+		length := binary.LittleEndian.Uint32(bytes[1:5])
+		msgBytes := bytes[6 : 6+length-1]
+		bytes = bytes[6+length:]
+
+		// convert to wsmsg.WebsocketMessage and append
+		msg := wsmsg.WebsocketMessage{}
+		if err := proto.Unmarshal(msgBytes, &msg); err != nil {
+			log.Println("fail to unmarshal:", err)
+			continue
+		}
+		messages = append(messages, msg)
+	}
+	return messages
+}
+func getSessionMessageBytes(msg wsmsg.WebsocketMessage) (msgBytesSlice [][]byte) {
+
+	fn := messageDir + msg.SessionId + ".message"
+
+	file, err := os.Open(fn)
+	if err != nil {
+		fmt.Println(err)
+		return msgBytesSlice
+	}
+	defer file.Close()
+
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(file)
+
+	bytes := buf.Bytes()
+	log.Printf("read file len: %v", len(bytes))
+	for {
+		// read type - do nothing for now
+		// msgType := bytes[0]
+		length := binary.LittleEndian.Uint32(bytes[1:5])
+		msgBytes := bytes[6 : 6+length-1]
+		if (len(bytes) - len(msgBytes)) <= 6 {
+			break
+		}
+		bytes = bytes[6+length:]
+
+		msgBytesSlice = append(msgBytesSlice, msgBytes)
+	}
+	return msgBytesSlice
+}
 
 func (h *Hub) run() {
 	for {
@@ -90,21 +187,34 @@ func (h *Hub) run() {
 			}
 			h.broadcast <- msgBytes
 
-		case msgByte := <-h.broadcast:
+		case msgBytes := <-h.broadcast:
 
 			// filtering: check the SessionId and Username
-			msg := &wsmsg.WebsocketMessage{}
-			if err := proto.Unmarshal(msgByte, msg); err != nil {
+			msg := wsmsg.WebsocketMessage{}
+			if err := proto.Unmarshal(msgBytes, &msg); err != nil {
 				log.Println("fail to unmarshal:", err)
 				continue
 			}
 			fmt.Printf("session %s: user %s\t: %v\n", msg.SessionId, msg.Username, msg.Message)
+			if err := saveSessionMessage(msg, msgBytes); err != nil {
+				log.Println("fail to saveSassionMessage:", err)
+			}
 
 			for _, client := range h.clients {
 				if client.Username == msg.Username {
-					if msg.Type != wsmsg.Type_Join {
+					if msg.Type == wsmsg.Type_Join {
 						log.Printf("send all history first")
 						// before sending welcome message, send all the history to newlyjoined
+						// getSessionMessage(msg) []wsmsg.WebsocketMessage and loop sending
+						for _, messageBytes := range getSessionMessageBytes(msg) {
+							select {
+							case client.send <- messageBytes:
+							default: // if client cannot consume, clear client
+								close(client.send)
+								delete(h.clients, client.conn)
+							}
+						}
+						continue
 					}
 				}
 
@@ -114,7 +224,7 @@ func (h *Hub) run() {
 				}
 
 				select {
-				case client.send <- msgByte:
+				case client.send <- msgBytes:
 				default: // if client cannot consume, clear client
 					close(client.send)
 					delete(h.clients, client.conn)
