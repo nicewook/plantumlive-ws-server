@@ -30,7 +30,7 @@ func receiveHandler(conn *websocket.Conn) {
 			log.Println("error on receiving:", err)
 			return
 		}
-
+		log.Printf("received %x", b)
 		msg := &wsmsg.WebsocketMessage{}
 		if err := proto.Unmarshal(b, msg); err != nil {
 			log.Printf("err: %v. %v: %v", err, msg.Username, msg.Message)

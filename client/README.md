@@ -13,3 +13,7 @@ Usage of /tmp/go-build3015340734/b001/exe/websocket-client:
   -url string
         websocket server url. default is ws://localhost:8080/ws
 ```
+
+### Run client example
+
+`$ go run . -s chatroom1 -u user1`

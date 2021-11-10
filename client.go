@@ -119,12 +119,13 @@ func (c *Client) writePump() {
 
 			w.Write(msgBytes)
 
-			// Add queued chat messages to the current websocket message.
-			n := len(c.send)
-			for i := 0; i < n; i++ {
-				w.Write(newline)
-				w.Write(<-c.send)
-			}
+			// Add queued chat messages to the current websocket message. - multiple message at once makes client side issue - so disable here
+			// https://stackoverflow.com/questions/60590283/gorilla-websockets-multiple-messages-in-one-event
+			// n := len(c.send)
+			// for i := 0; i < n; i++ {
+			// 	w.Write(newline)
+			// 	w.Write(<-c.send)
+			// }
 
 			if err := w.Close(); err != nil {
 				return

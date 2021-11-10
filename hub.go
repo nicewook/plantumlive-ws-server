@@ -52,7 +52,10 @@ const (
 
 const messageDir = "./messages/"
 
-func saveSessionMessage(msg wsmsg.WebsocketMessage, b []byte) error {
+func saveSessionMessage(msg *wsmsg.WebsocketMessage, b []byte) error {
+
+	// marshalled protobuf message print
+	log.Printf("save messageBytes: %x", b)
 
 	// open file
 	fn := messageDir + msg.SessionId + ".message"
@@ -75,45 +78,47 @@ func saveSessionMessage(msg wsmsg.WebsocketMessage, b []byte) error {
 	b = append(length, b...)
 	b = append(msgType, b...)
 
+	log.Printf("formed messageBytes: %x", b)
+
 	if _, err := f.Write(b); err != nil {
 		return err
 	}
 	return nil
 }
 
-func getSessionMessage(msg wsmsg.WebsocketMessage) (messages []wsmsg.WebsocketMessage) {
+// func getSessionMessage(msg wsmsg.WebsocketMessage) (messages []wsmsg.WebsocketMessage) {
 
-	fn := messageDir + msg.SessionId + ".message"
+// 	fn := messageDir + msg.SessionId + ".message"
 
-	file, err := os.Open(fn)
-	if err != nil {
-		fmt.Println(err)
-		return messages
-	}
-	defer file.Close()
+// 	file, err := os.Open(fn)
+// 	if err != nil {
+// 		fmt.Println(err)
+// 		return messages
+// 	}
+// 	defer file.Close()
 
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(file)
+// 	buf := new(bytes.Buffer)
+// 	buf.ReadFrom(file)
 
-	bytes := buf.Bytes()
-	for len(bytes) > 5 {
-		// read type - do nothing for now
-		// msgType := bytes[0]
-		length := binary.LittleEndian.Uint32(bytes[1:5])
-		msgBytes := bytes[6 : 6+length-1]
-		bytes = bytes[6+length:]
+// 	bytes := buf.Bytes()
+// 	for len(bytes) > 5 {
+// 		// read type - do nothing for now
+// 		// msgType := bytes[0]
+// 		length := binary.LittleEndian.Uint32(bytes[1:5])
+// 		msgBytes := bytes[5 : 5+length]
+// 		bytes = bytes[6+length:]
 
-		// convert to wsmsg.WebsocketMessage and append
-		msg := wsmsg.WebsocketMessage{}
-		if err := proto.Unmarshal(msgBytes, &msg); err != nil {
-			log.Println("fail to unmarshal:", err)
-			continue
-		}
-		messages = append(messages, msg)
-	}
-	return messages
-}
-func getSessionMessageBytes(msg wsmsg.WebsocketMessage) (msgBytesSlice [][]byte) {
+// 		// convert to wsmsg.WebsocketMessage and append
+// 		msg := wsmsg.WebsocketMessage{}
+// 		if err := proto.Unmarshal(msgBytes, &msg); err != nil {
+// 			log.Println("fail to unmarshal:", err)
+// 			continue
+// 		}
+// 		messages = append(messages, msg)
+// 	}
+// 	return messages
+// }
+func getSessionMessageBytes(msg *wsmsg.WebsocketMessage) (msgBytesSlice [][]byte) {
 
 	fn := messageDir + msg.SessionId + ".message"
 
@@ -133,11 +138,13 @@ func getSessionMessageBytes(msg wsmsg.WebsocketMessage) (msgBytesSlice [][]byte)
 		// read type - do nothing for now
 		// msgType := bytes[0]
 		length := binary.LittleEndian.Uint32(bytes[1:5])
-		msgBytes := bytes[6 : 6+length-1]
+		log.Println("length:", length)
+
+		msgBytes := bytes[5 : 5+length]
 		if (len(bytes) - len(msgBytes)) <= 6 {
 			break
 		}
-		bytes = bytes[6+length:]
+		bytes = bytes[5+length:]
 
 		msgBytesSlice = append(msgBytesSlice, msgBytes)
 	}
@@ -190,8 +197,8 @@ func (h *Hub) run() {
 		case msgBytes := <-h.broadcast:
 
 			// filtering: check the SessionId and Username
-			msg := wsmsg.WebsocketMessage{}
-			if err := proto.Unmarshal(msgBytes, &msg); err != nil {
+			msg := &wsmsg.WebsocketMessage{}
+			if err := proto.Unmarshal(msgBytes, msg); err != nil {
 				log.Println("fail to unmarshal:", err)
 				continue
 			}
@@ -206,7 +213,10 @@ func (h *Hub) run() {
 						log.Printf("send all history first")
 						// before sending welcome message, send all the history to newlyjoined
 						// getSessionMessage(msg) []wsmsg.WebsocketMessage and loop sending
-						for _, messageBytes := range getSessionMessageBytes(msg) {
+						messageHistory := getSessionMessageBytes(msg)
+						log.Printf("message count: %v", len(messageHistory))
+						for _, messageBytes := range messageHistory {
+							log.Printf("messageBytes: %x", messageBytes)
 							select {
 							case client.send <- messageBytes:
 							default: // if client cannot consume, clear client
