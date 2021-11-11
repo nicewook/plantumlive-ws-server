@@ -17,3 +17,5 @@ Usage of /tmp/go-build3015340734/b001/exe/websocket-client:
 ### Run client example
 
 `$ go run . -s chatroom1 -u user1`
+
+`$ go run . -s chatroom1 -u user1 -url ws://plantumliveserver.herokuapp.com/ws`

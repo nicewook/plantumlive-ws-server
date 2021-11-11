@@ -9,6 +9,7 @@ enum Type {
   Unknown = 0;
   Connected = 1;
   Join = 2;
+  Leave = 3;
 
   // message type
   Msg = 100;

@@ -39,7 +39,7 @@ func receiveHandler(conn *websocket.Conn) {
 		// filtering and displaying
 		switch msg.GetType() {
 		case wsmsg.Type_Connected:
-			fmt.Printf("=== websocket server connected: %v ===\n", msg.Message)
+			fmt.Printf("=== %v ===\n", msg.Message)
 			// ask for join automatically
 			msgBytes, err := proto.Marshal(&wsmsg.WebsocketMessage{
 				Type:      msg.GetType(), // TODO: proto enum
@@ -53,15 +53,19 @@ func receiveHandler(conn *websocket.Conn) {
 			}
 			sendMsg <- msgBytes
 		case wsmsg.Type_Join:
-			if msg.GetUsername() == *usernameP {
-				fmt.Printf("=== joined to the sesson %s successfully ===\n", msg.GetSessionId())
-			} else {
-				fmt.Printf("\n%v\n\n", msg.GetMessage())
-			}
+			// if msg.GetUsername() == *usernameP {
+			// 	fmt.Printf("=== joined to the sesson %s successfully ===\n", msg.GetSessionId())
+			// } else {
+			// 	fmt.Printf("\n%v\n\n", msg.GetMessage())
+			// }
+			fallthrough
+		case wsmsg.Type_Leave:
+			fallthrough
 		case wsmsg.Type_Msg:
-			fmt.Printf("session %s: user %s\t: %v\n", msg.SessionId, msg.Username, msg.Message)
+			fmt.Printf("session id: %s, username: %s\t\t: %v\n", msg.SessionId, msg.Username, msg.Message)
 		default:
-			fmt.Printf("unknown type of message: %s\n", msg.GetType())
+			log.Printf("unknown type of message: %s\n", msg.GetType())
+			fmt.Printf("session id: %s, username: %s\t\t: %v\n", msg.SessionId, msg.Username, msg.Message)
 		}
 		log.Printf("msg received: %v: %v\n", msg.Username, msg.Message)
 	}
