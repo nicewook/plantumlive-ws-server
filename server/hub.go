@@ -51,6 +51,7 @@ const (
 )
 
 const messageDir = "./messages/"
+const serverAnnounce = "server"
 
 func saveSessionMessage(msg *wsmsg.WebsocketMessage, b []byte) error {
 
@@ -141,7 +142,9 @@ func getSessionMessageBytes(msg *wsmsg.WebsocketMessage) (msgBytesSlice [][]byte
 		log.Println("length:", length)
 
 		msgBytes := bytes[5 : 5+length]
-		if (len(bytes) - len(msgBytes)) <= 6 {
+		restBytesLen := len(bytes) - len(msgBytes)
+		if restBytesLen < 5 {
+			log.Printf("left bytes: %x", restBytesLen)
 			break
 		}
 		bytes = bytes[5+length:]
@@ -171,8 +174,23 @@ func (h *Hub) run() {
 			client.send <- msgBytes
 
 		case client := <-h.unregister:
-			if _, ok := h.clients[client.conn]; ok {
+			if leaveClient, ok := h.clients[client.conn]; ok {
 				fmt.Printf("disconnect user %s in the session %s\n", client.Username, client.SessionID)
+
+				// leave message to everybody
+				msgBytes, err := proto.Marshal(&wsmsg.WebsocketMessage{
+					Type:      wsmsg.Type_Join,
+					SessionId: leaveClient.SessionID,
+					Username:  leaveClient.Username,
+					Message:   fmt.Sprintf("=== %s just leaved ===", leaveClient.Username),
+				})
+				if err != nil {
+					log.Println("fail to marshal:", err)
+					continue
+				}
+				h.broadcast <- msgBytes
+
+				// delete user
 				delete(h.clients, client.conn)
 				close(client.send)
 			}
@@ -183,10 +201,10 @@ func (h *Hub) run() {
 
 			// join message to everybody
 			msgBytes, err := proto.Marshal(&wsmsg.WebsocketMessage{
-				Type:      wsmsg.Type_Join, // TODO: proto enum
+				Type:      wsmsg.Type_Join,
 				SessionId: joinClient.SessionID,
 				Username:  joinClient.Username,
-				Message:   fmt.Sprintf("=== user %s just joined ===", joinClient.Username),
+				Message:   fmt.Sprintf("=== %s just joined ===", joinClient.Username),
 			})
 			if err != nil {
 				log.Println("fail to marshal:", err)
