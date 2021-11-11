@@ -52,7 +52,6 @@ gen.proto:
 	cp -r server/wsmsg client/wsmsg
 	
 # reserved for the later reference ##################################
-
 .PHONY: install.go
 install.go: install.go.notidy ## install go with dependencies
 	cd server && go mod tidy
